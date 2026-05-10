@@ -10,6 +10,7 @@ from __future__ import annotations
 import enum
 
 from sqlalchemy import Boolean, CheckConstraint, Enum, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin
@@ -51,3 +52,12 @@ class SystemConfig(Base, TimestampMixin):
     s3_signed_url_ttl: Mapped[int] = mapped_column(Integer, nullable=False, default=3600)
 
     retention_days: Mapped[int] = mapped_column(Integer, nullable=False, default=14)
+
+    # Allowlist of COCO-80 class names YOLO should emit detection events for.
+    # The AI engine reads this on pipeline start. Stored as JSONB so we get
+    # cheap containment queries (`@>`) for analytics later.
+    detection_classes: Mapped[list[str]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+    )

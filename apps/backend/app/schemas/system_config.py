@@ -21,6 +21,7 @@ class SystemConfigPublic(BaseModel):
     s3_use_ssl: bool
     s3_signed_url_ttl: int
     retention_days: int
+    detection_classes: list[str] = Field(default_factory=list)
 
     # Surfaces whether a real secret has been set (vs the seed placeholder).
     s3_secret_set: bool
@@ -40,6 +41,8 @@ class SystemConfigUpdate(BaseModel):
     s3_use_ssl: bool | None = None
     s3_signed_url_ttl: int | None = Field(default=None, ge=60, le=86400)
     retention_days: int | None = Field(default=None, ge=1, le=3650)
+    # No length cap so admins can enable all 80 COCO classes if they want.
+    detection_classes: list[str] | None = None
 
 
 class AppVersion(BaseModel):

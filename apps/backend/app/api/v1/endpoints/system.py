@@ -44,6 +44,7 @@ def _to_public(entity, *, secret_set: bool) -> SystemConfigPublic:
         s3_use_ssl=entity.s3_use_ssl,
         s3_signed_url_ttl=entity.s3_signed_url_ttl,
         retention_days=entity.retention_days,
+        detection_classes=list(entity.detection_classes or []),
         s3_secret_set=secret_set,
         created_at=entity.created_at,
         updated_at=entity.updated_at,
