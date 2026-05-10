@@ -53,7 +53,8 @@ For Flutter:
 ```bash
 cd apps/frontend
 flutter pub get
-flutter run -d chrome   # or -d linux / -d android
+flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0
+# then open http://localhost:8080 — or use -d chrome / -d linux / -d android
 ```
 
 ## Documentation

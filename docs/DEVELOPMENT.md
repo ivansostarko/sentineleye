@@ -34,9 +34,10 @@ cd services/notification-service
 source .venv/bin/activate
 uvicorn app.main:app --reload --port 8300
 
-# Flutter
+# Flutter — web-server works for any browser and runs as root.
+# Use `-d chrome` instead if running as a non-root user and want auto-launch.
 cd apps/frontend
-flutter run -d chrome
+flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0
 ```
 
 ## Testing

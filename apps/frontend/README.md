@@ -6,8 +6,12 @@ Multi-platform client (Web, Linux desktop, Android) for the SentinelEye backend.
 
 ```bash
 flutter pub get
-flutter run -d chrome   # or -d linux / -d android
+flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0
+# then open http://localhost:8080
 ```
+
+Other targets: `-d chrome` (auto-launches Chrome — requires non-root user),
+`-d linux`, or `-d android`.
 
 ## Configuration
 

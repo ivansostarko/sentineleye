@@ -7,7 +7,7 @@ Three install paths, in order of "easiest first."
 Prerequisites: Docker 24+, Docker Compose plugin, 4 GB RAM, 10 GB disk.
 
 ```bash
-git clone <your-fork>/sentineleye.git
+git clone ivansostarko/sentineleye.git
 cd sentineleye
 cp .env.example .env
 # Edit .env — at minimum set SECRET_KEY to a long random string.
@@ -48,8 +48,12 @@ Then run the Flutter client:
 ```bash
 cd apps/frontend
 flutter pub get
-flutter run -d chrome
+flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0
 ```
+
+Open http://localhost:8080 in your browser. Use `-d chrome` instead if you
+want Flutter to launch a browser for you (requires running as a non-root
+user — Chrome refuses to start as root without `--no-sandbox`).
 
 ## 2. Local dev (no Docker)
 
