@@ -84,5 +84,53 @@ postgres-data/
 redis-data/
 minio-data/
 
+# ─── Build / tooling caches ─────────────────────────────────────────
+# .cache/ is used by scripts/build/build-android.sh for the persistent
+# Gradle cache (multi-GB). Never commit it.
+.cache/
+.gradle/
+**/.gradle/
+.cxx/
+.kotlin/
+
+# ─── Test / coverage artifacts ──────────────────────────────────────
+coverage/
+coverage.xml
+.coverage.*
+junit.xml
+pytest-report.xml
+
+# ─── Native build outputs that escape dist/ ─────────────────────────
+# Most artifacts go through dist/ (already ignored above) but loose
+# binaries from ad-hoc builds shouldn't sneak in.
+*.apk
+*.aab
+*.ipa
+*.dmg
+*.deb
+*.rpm
+*.AppImage
+*.msi
+*.exe
+*.app/
+
+# ─── Editor / OS extras (catch what other sections missed) ──────────
+*~
+*.swp
+*.swo
+*.bak
+*.tmp
+._*
+.AppleDouble
+.LSOverride
+Icon?
+$RECYCLE.BIN/
+*.lnk
+
+# ─── Scratch directories ────────────────────────────────────────────
+tmp/
+temp/
+scratch/
+
 # ─── Node (if any tooling shows up) ─────────────────────────────────
 node_modules/
