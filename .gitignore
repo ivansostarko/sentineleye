@@ -92,6 +92,8 @@ minio-data/
 **/.gradle/
 .cxx/
 .kotlin/
+dist/
+build/
 
 # ─── Test / coverage artifacts ──────────────────────────────────────
 coverage/

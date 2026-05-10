@@ -10,8 +10,9 @@ from app.db.repositories.camera import CameraRepository
 from app.db.repositories.cloud_integration import CloudIntegrationRepository
 from app.models.camera import Camera, CameraProtocol
 from app.models.cloud_integration import CloudProvider
-from app.schemas.camera import CameraCreate, CameraUpdate
+from app.schemas.camera import CameraCreate, CameraPublic, CameraUpdate
 from app.services import crypto
+from app.services.cache import TTL_MEDIUM, TTL_SHORT, Cache, Keys, get_cache
 from app.services.control_plane import AiEngineClient, RecordingClient
 from app.services.tuya_cloud import TuyaClient, TuyaError
 
@@ -36,11 +37,13 @@ class CameraService:
         integrations: CloudIntegrationRepository,
         recording: RecordingClient | None = None,
         ai_engine: AiEngineClient | None = None,
+        cache: Cache | None = None,
     ) -> None:
         self.cameras = cameras
         self.integrations = integrations
         self._recording = recording or RecordingClient()
         self._ai_engine = ai_engine or AiEngineClient()
+        self._cache = cache or get_cache()
 
     # ── CRUD ─────────────────────────────────────────────────────────
     async def create(self, payload: CameraCreate) -> Camera:
@@ -48,6 +51,7 @@ class CameraService:
         await self.cameras.add(camera)
         await self.cameras.session.flush()  # populate camera.id
         await self._reconcile(camera, prev_record=False, prev_detect=False)
+        await self._cache.invalidate(Keys.CAMERAS_ALL)
         return camera
 
     async def get(self, camera_id: UUID) -> Camera:
@@ -56,10 +60,47 @@ class CameraService:
             raise NotFoundError(f"Camera {camera_id} not found.")
         return camera
 
+    async def get_public_cached(self, camera_id: UUID) -> CameraPublic:
+        """Read-through cached lookup returning the API schema directly.
+
+        The endpoint layer should prefer this over ``get()`` — a hit avoids
+        the DB round-trip entirely and skips ORM hydration.
+        """
+        cached = await self._cache.get(Keys.camera(camera_id))
+        if cached is not None:
+            return CameraPublic.model_validate(cached)
+        camera = await self.get(camera_id)
+        public = CameraPublic.model_validate(camera, from_attributes=True)
+        await self._cache.set(
+            Keys.camera(camera_id),
+            public.model_dump(mode="json"),
+            ttl_seconds=TTL_MEDIUM,
+        )
+        return public
+
     async def list(self, *, offset: int, limit: int) -> tuple[list[Camera], int]:
         items = await self.cameras.list(offset=offset, limit=limit)
         total = await self.cameras.count()
         return items, total
+
+    async def list_public_cached(
+        self, *, offset: int, limit: int,
+    ) -> tuple[list[CameraPublic], int]:
+        """Cached paginated list. Short TTL — dashboard refreshes every 30s."""
+        cached = await self._cache.get(Keys.camera_list(offset, limit))
+        if cached is not None:
+            return (
+                [CameraPublic.model_validate(c) for c in cached["items"]],
+                int(cached["total"]),
+            )
+        items, total = await self.list(offset=offset, limit=limit)
+        publics = [CameraPublic.model_validate(c, from_attributes=True) for c in items]
+        await self._cache.set(
+            Keys.camera_list(offset, limit),
+            {"items": [p.model_dump(mode="json") for p in publics], "total": total},
+            ttl_seconds=TTL_SHORT,
+        )
+        return publics, total
 
     async def update(self, camera_id: UUID, payload: CameraUpdate) -> Camera:
         camera = await self.get(camera_id)
@@ -71,6 +112,7 @@ class CameraService:
         await self.cameras.session.flush()
 
         await self._reconcile(camera, prev_record=prev_record, prev_detect=prev_detect)
+        await self._cache.invalidate(Keys.CAMERAS_ALL)
         return camera
 
     async def delete(self, camera_id: UUID) -> None:
@@ -78,6 +120,7 @@ class CameraService:
         await self._recording.stop(str(camera.id))
         await self._ai_engine.stop(str(camera.id))
         await self.cameras.delete(camera)
+        await self._cache.invalidate(Keys.CAMERAS_ALL)
 
     # ── Source resolution ────────────────────────────────────────────
     async def resolve_source(self, camera: Camera) -> str | None:
