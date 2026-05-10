@@ -9,7 +9,15 @@ from fastapi import APIRouter, Depends, status
 from app.api.v1.deps import auth_service, get_current_user
 from app.core.security import decode_token
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RefreshRequest, TokenPair, UserCreate, UserPublic
+from app.schemas.auth import (
+    LoginRequest,
+    PasswordChangeRequest,
+    RefreshRequest,
+    TokenPair,
+    UserCreate,
+    UserProfileUpdate,
+    UserPublic,
+)
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -62,3 +70,28 @@ async def me(user: Annotated[User, Depends(get_current_user)]) -> UserPublic:
         role=user.role,
         is_active=user.is_active,
     )
+
+
+@router.patch("/me", response_model=UserPublic)
+async def update_me(
+    payload: UserProfileUpdate,
+    user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[AuthService, Depends(auth_service)],
+) -> UserPublic:
+    updated = await service.update_profile(user, payload)
+    return UserPublic(
+        id=str(updated.id),
+        email=updated.email,
+        full_name=updated.full_name,
+        role=updated.role,
+        is_active=updated.is_active,
+    )
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    payload: PasswordChangeRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[AuthService, Depends(auth_service)],
+) -> None:
+    await service.change_password(user, payload.current_password, payload.new_password)

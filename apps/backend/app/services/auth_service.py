@@ -6,7 +6,7 @@ from app.core.exceptions import ConflictError, UnauthorizedError
 from app.core.security import create_token, hash_password, verify_password
 from app.db.repositories.user import UserRepository
 from app.models.user import User
-from app.schemas.auth import TokenPair, UserCreate
+from app.schemas.auth import TokenPair, UserCreate, UserProfileUpdate
 
 
 class AuthService:
@@ -38,3 +38,17 @@ class AuthService:
             access_token=create_token(user.id, token_type="access", extra_claims={"role": user.role.value}),
             refresh_token=create_token(user.id, token_type="refresh"),
         )
+
+    async def update_profile(self, user: User, payload: UserProfileUpdate) -> User:
+        for field, value in payload.model_dump(exclude_unset=True).items():
+            setattr(user, field, value)
+        await self.users.session.flush()
+        return user
+
+    async def change_password(self, user: User, current: str, new: str) -> None:
+        if not verify_password(current, user.hashed_password):
+            raise UnauthorizedError("Current password is incorrect.")
+        if current == new:
+            raise UnauthorizedError("New password must differ from the current one.")
+        user.hashed_password = hash_password(new)
+        await self.users.session.flush()

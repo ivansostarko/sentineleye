@@ -35,3 +35,14 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     full_name: str | None = None
     role: UserRole = UserRole.VIEWER
+
+
+class UserProfileUpdate(BaseModel):
+    """User-self profile patch. Email and role are immutable from this endpoint."""
+
+    full_name: str | None = Field(default=None, max_length=255)
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=8, max_length=128, repr=False)
+    new_password: str = Field(min_length=8, max_length=128, repr=False)
