@@ -32,3 +32,4 @@ class DetectionEventPublic(DetectionEventCreate):
     id: UUID
     created_at: datetime
     snapshot_url: str | None = None
+    camera_name: str | None = None  # joined for display; None on lone get()

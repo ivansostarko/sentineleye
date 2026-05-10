@@ -23,11 +23,12 @@ from app.services.event_bus import DETECTION_CHANNEL, publish
 router = APIRouter(prefix="/detection-events", tags=["detection-events"])
 
 
-def _to_public(event: DetectionEvent) -> DetectionEventPublic:
+def _to_public(event: DetectionEvent, *, camera_name: str | None = None) -> DetectionEventPublic:
     return DetectionEventPublic.model_validate(
         {
             "id": event.id,
             "camera_id": event.camera_id,
+            "camera_name": camera_name,
             "occurred_at": event.occurred_at,
             "object_class": event.object_class,
             "confidence": event.confidence,
@@ -46,6 +47,8 @@ async def list_events(
     _user: Annotated[User, Depends(get_current_user)],
     camera_id: UUID | None = None,
     object_class: str | None = None,
+    classes_in: list[str] | None = Query(default=None),
+    min_confidence: float | None = Query(default=None, ge=0.0, le=1.0),
     start: datetime | None = None,
     end: datetime | None = None,
     page: int = Query(1, ge=1),
@@ -54,13 +57,18 @@ async def list_events(
     items, total = await repo.search(
         camera_id=camera_id,
         object_class=object_class,
+        classes_in=classes_in,
+        min_confidence=min_confidence,
         start=start,
         end=end,
         offset=(page - 1) * size,
         limit=size,
     )
     return Page[DetectionEventPublic](
-        items=[_to_public(e) for e in items], total=total, page=page, size=size
+        items=[_to_public(e, camera_name=name) for (e, name) in items],
+        total=total,
+        page=page,
+        size=size,
     )
 
 
