@@ -17,6 +17,11 @@ class CameraProtocol(str, enum.Enum):
     USB = "usb"
     HTTP = "http"
     MJPEG = "mjpeg"
+    # Tuya cameras have no LAN endpoint — the URL is allocated dynamically
+    # via the Tuya OpenAPI and refreshed by a Celery beat task. The `url`
+    # column stores the most-recently-allocated stream; `config` carries
+    # `tuya_device_id` and (optionally) `tuya_integration_id`.
+    TUYA = "tuya"
 
 
 class CameraStatus(str, enum.Enum):
@@ -32,7 +37,11 @@ class Camera(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     location: Mapped[str | None] = mapped_column(String(255))
     protocol: Mapped[CameraProtocol] = mapped_column(
-        Enum(CameraProtocol, name="camera_protocol"),
+        Enum(
+            CameraProtocol,
+            name="camera_protocol",
+            values_callable=lambda enum_cls: [m.value for m in enum_cls],
+        ),
         nullable=False,
     )
     url: Mapped[str] = mapped_column(String(1024), nullable=False)
@@ -47,7 +56,11 @@ class Camera(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     bitrate_kbps: Mapped[int | None] = mapped_column(Integer)
 
     status: Mapped[CameraStatus] = mapped_column(
-        Enum(CameraStatus, name="camera_status"),
+        Enum(
+            CameraStatus,
+            name="camera_status",
+            values_callable=lambda enum_cls: [m.value for m in enum_cls],
+        ),
         default=CameraStatus.UNKNOWN,
         nullable=False,
     )

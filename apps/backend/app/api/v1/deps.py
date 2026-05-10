@@ -13,6 +13,7 @@ from app.core.security import decode_token
 from app.db.repositories import (
     AlertRuleRepository,
     CameraRepository,
+    CloudIntegrationRepository,
     DetectionEventRepository,
     RecordingRepository,
     UserRepository,
@@ -21,6 +22,7 @@ from app.db.session import get_session
 from app.models.user import User, UserRole
 from app.services.auth_service import AuthService
 from app.services.camera_service import CameraService
+from app.services.cloud_integration_service import CloudIntegrationService
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 
@@ -46,13 +48,26 @@ def alert_repo(session: DbSession) -> AlertRuleRepository:
     return AlertRuleRepository(session)
 
 
+def cloud_integration_repo(session: DbSession) -> CloudIntegrationRepository:
+    return CloudIntegrationRepository(session)
+
+
 # ─── Services ──────────────────────────────────────────────────────────
 def auth_service(users: Annotated[UserRepository, Depends(user_repo)]) -> AuthService:
     return AuthService(users)
 
 
-def camera_service(cameras: Annotated[CameraRepository, Depends(camera_repo)]) -> CameraService:
-    return CameraService(cameras)
+def camera_service(
+    cameras: Annotated[CameraRepository, Depends(camera_repo)],
+    integrations: Annotated[CloudIntegrationRepository, Depends(cloud_integration_repo)],
+) -> CameraService:
+    return CameraService(cameras, integrations)
+
+
+def cloud_integration_service(
+    integrations: Annotated[CloudIntegrationRepository, Depends(cloud_integration_repo)],
+) -> CloudIntegrationService:
+    return CloudIntegrationService(integrations)
 
 
 # ─── Auth dependencies ────────────────────────────────────────────────

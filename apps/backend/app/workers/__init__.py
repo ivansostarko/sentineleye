@@ -35,5 +35,10 @@ celery_app.conf.update(
             "task": "app.workers.tasks.camera_health_check",
             "schedule": 60.0,  # every minute
         },
+        # Tuya RTSP URLs expire ~10 min after allocation; refresh well before.
+        "refresh-tuya-streams": {
+            "task": "app.workers.tasks.refresh_tuya_streams",
+            "schedule": 240.0,  # every 4 minutes
+        },
     },
 )

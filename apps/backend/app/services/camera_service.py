@@ -4,31 +4,45 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import AppError, NotFoundError
+from app.core.logging import get_logger
 from app.db.repositories.camera import CameraRepository
-from app.models.camera import Camera
+from app.db.repositories.cloud_integration import CloudIntegrationRepository
+from app.models.camera import Camera, CameraProtocol
+from app.models.cloud_integration import CloudProvider
 from app.schemas.camera import CameraCreate, CameraUpdate
+from app.services import crypto
 from app.services.control_plane import AiEngineClient, RecordingClient
+from app.services.tuya_cloud import TuyaClient, TuyaError
+
+log = get_logger(__name__)
 
 
 class CameraService:
     """Persists cameras + reconciles downstream recording/AI pipelines.
 
-    Downstream calls are best-effort (see `control_plane`): a recording-service
-    or ai-engine outage will not block the CRUD operation. The camera row is
-    the source of truth; downstream services can be reconciled from it.
+    For LAN-native protocols (RTSP/ONVIF/etc.) the camera URL goes straight
+    to the recording-service / ai-engine. For `tuya` cameras the URL is
+    allocated dynamically against the Tuya cloud and refreshed periodically
+    by `app.workers.tasks.refresh_tuya_streams`.
+
+    Downstream calls are best-effort: a recording-service or ai-engine
+    outage will not block the CRUD operation.
     """
 
     def __init__(
         self,
         cameras: CameraRepository,
+        integrations: CloudIntegrationRepository,
         recording: RecordingClient | None = None,
         ai_engine: AiEngineClient | None = None,
     ) -> None:
         self.cameras = cameras
+        self.integrations = integrations
         self._recording = recording or RecordingClient()
         self._ai_engine = ai_engine or AiEngineClient()
 
+    # ── CRUD ─────────────────────────────────────────────────────────
     async def create(self, payload: CameraCreate) -> Camera:
         camera = Camera(**payload.model_dump())
         await self.cameras.add(camera)
@@ -61,24 +75,87 @@ class CameraService:
 
     async def delete(self, camera_id: UUID) -> None:
         camera = await self.get(camera_id)
-        # Stop downstream first so they don't keep writing to a deleted camera.
         await self._recording.stop(str(camera.id))
         await self._ai_engine.stop(str(camera.id))
         await self.cameras.delete(camera)
 
+    # ── Source resolution ────────────────────────────────────────────
+    async def resolve_source(self, camera: Camera) -> str | None:
+        """Return the URL the recording-service / ai-engine should connect to.
+
+        For Tuya cameras: allocate a fresh stream URL via the Tuya cloud and
+        cache it on the camera row. Returns None on resolution failure
+        (best-effort; orchestrator logs and skips).
+        """
+        if camera.protocol != CameraProtocol.TUYA:
+            return self._embed_credentials(camera)
+
+        device_id = (camera.config or {}).get("tuya_device_id")
+        if not device_id:
+            log.warning("camera.tuya_no_device_id", camera_id=str(camera.id))
+            return None
+
+        client = await self._tuya_client()
+        if client is None:
+            log.warning("camera.tuya_no_integration", camera_id=str(camera.id))
+            return None
+        try:
+            url = await client.allocate_stream(device_id, kind="rtsp")
+        except TuyaError as exc:
+            log.warning("camera.tuya_allocate_failed", camera_id=str(camera.id), error=str(exc))
+            return None
+
+        # Cache the URL on the camera row so the recording-service can read it
+        # via /api/v1/cameras/{id} at start-up time too.
+        camera.url = url
+        await self.cameras.session.flush()
+        return url
+
+    async def _tuya_client(self) -> TuyaClient | None:
+        entity = await self.integrations.first_for(CloudProvider.TUYA)
+        if entity is None:
+            return None
+        return TuyaClient(
+            access_id=crypto.decrypt(entity.access_id_enc),
+            access_secret=crypto.decrypt(entity.access_secret_enc),
+            region=entity.region,
+        )
+
+    @staticmethod
+    def _embed_credentials(camera: Camera) -> str:
+        """Splice user:pass into a URL when stored out-of-band."""
+        url = camera.url
+        if not (camera.username or camera.password):
+            return url
+        if camera.protocol.value not in {"rtsp", "rtmp", "http", "mjpeg"} or "://" not in url:
+            return url
+        scheme, rest = url.split("://", 1)
+        if "@" in rest.split("/", 1)[0]:
+            return url
+        creds = f"{camera.username or ''}:{camera.password or ''}"
+        return f"{scheme}://{creds}@{rest}"
+
+    # ── Reconciliation ───────────────────────────────────────────────
     async def _reconcile(
         self, camera: Camera, *, prev_record: bool, prev_detect: bool,
     ) -> None:
-        """Diff desired vs previous state and call start/stop accordingly."""
         wants_record = camera.enabled and camera.record_continuous
         wants_detect = camera.enabled and camera.detection_enabled
 
-        if wants_record and not prev_record:
-            await self._recording.start(camera)
+        # Resolve the source URL once if any pipeline needs to start.
+        source: str | None = None
+        if (wants_record and not prev_record) or (wants_detect and not prev_detect):
+            try:
+                source = await self.resolve_source(camera)
+            except AppError as exc:
+                log.warning("camera.source_resolve_failed", camera_id=str(camera.id), error=str(exc))
+
+        if wants_record and not prev_record and source:
+            await self._recording.start(camera, source=source)
         elif prev_record and not wants_record:
             await self._recording.stop(str(camera.id))
 
-        if wants_detect and not prev_detect:
-            await self._ai_engine.start(camera)
+        if wants_detect and not prev_detect and source:
+            await self._ai_engine.start(camera, source=source)
         elif prev_detect and not wants_detect:
             await self._ai_engine.stop(str(camera.id))

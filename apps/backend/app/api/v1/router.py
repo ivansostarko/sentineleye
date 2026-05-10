@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     alerts,
     auth,
     cameras,
+    cloud_integrations,
     detection_events,
     recordings,
     system,
@@ -17,6 +18,7 @@ from app.api.v1.endpoints import (
 api_router = APIRouter()
 api_router.include_router(auth.router)
 api_router.include_router(cameras.router)
+api_router.include_router(cloud_integrations.router)
 api_router.include_router(detection_events.router)
 api_router.include_router(recordings.router)
 api_router.include_router(alerts.router)
