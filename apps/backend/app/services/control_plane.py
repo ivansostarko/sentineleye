@@ -53,7 +53,14 @@ class RecordingClient(_BaseControlClient):
     async def start(self, camera: Camera, *, source: str) -> None:
         await self._post(
             "/recorders/start",
-            json={"camera_id": str(camera.id), "source": source},
+            json={
+                "camera_id": str(camera.id),
+                "source": source,
+                # Pass the full config blob — USB cameras need v4l2 hints
+                # (input_format/video_size/framerate); other transports
+                # currently ignore it.
+                "config": dict(camera.config or {}),
+            },
         )
 
     async def stop(self, camera_id: str) -> None:
@@ -71,6 +78,7 @@ class AiEngineClient(_BaseControlClient):
                 "camera_id": str(camera.id),
                 "source": source,
                 "target_fps": camera.target_fps,
+                "config": dict(camera.config or {}),
             },
         )
 

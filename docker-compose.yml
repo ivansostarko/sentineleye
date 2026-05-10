@@ -85,6 +85,15 @@ services:
       - "8000:8000"
     volumes:
       - recordings-data:/data/recordings
+    devices:
+      - "/dev/video0:/dev/video0"
+      - "/dev/video1:/dev/video1"
+      - "/dev/video2:/dev/video2"
+      - "/dev/video3:/dev/video3"
+      - "/dev/video4:/dev/video4"
+      - "/dev/video5:/dev/video5"
+    group_add:
+      - "44"
 
   backend-worker:
     build:
@@ -100,6 +109,15 @@ services:
     command: ["celery", "-A", "app.workers.celery_app", "worker", "--beat", "-l", "info"]
     volumes:
       - recordings-data:/data/recordings
+    devices:
+      - "/dev/video0:/dev/video0"
+      - "/dev/video1:/dev/video1"
+      - "/dev/video2:/dev/video2"
+      - "/dev/video3:/dev/video3"
+      - "/dev/video4:/dev/video4"
+      - "/dev/video5:/dev/video5"
+    group_add:
+      - "44"
 
   ai-engine:
     build:
@@ -117,6 +135,18 @@ services:
       - "8100:8100"
     volumes:
       - ai-models:/app/models
+    # ─── USB cameras ─────────────────────────────────────────────
+    # Pass through V4L2 character devices for cameras configured with
+    # protocol=usb. Uncomment the lines that match the `/dev/videoN`
+    # entries `lsusb`/`v4l2-ctl --list-devices` reports on the host.
+    # Adding a device that doesn't exist on the host makes `docker compose up`
+    # fail, so keep these commented when you have no USB camera attached.
+    # See docs/camera-connections/USB.md for the full setup.
+    # devices:
+    #   - "/dev/video0:/dev/video0"
+    #   - "/dev/video2:/dev/video2"
+    # group_add:
+    #   - "44"   # host video group GID — `getent group video` to verify
 
   recording-service:
     build:
@@ -134,6 +164,25 @@ services:
       - "8200:8200"
     volumes:
       - recordings-data:/data/recordings
+    devices:
+      - "/dev/video0:/dev/video0"
+      - "/dev/video1:/dev/video1"
+      - "/dev/video2:/dev/video2"
+      - "/dev/video3:/dev/video3"
+      - "/dev/video4:/dev/video4"
+      - "/dev/video5:/dev/video5"
+    group_add:
+      - "44"
+
+    # ─── USB cameras ─────────────────────────────────────────────
+    # Mirror the same device list as the ai-engine block above. Both
+    # services need read access — the recorder writes the .mp4, the AI
+    # engine pulls frames for inference. See docs/camera-connections/USB.md.
+    # devices:
+    #   - "/dev/video0:/dev/video0"
+    #   - "/dev/video2:/dev/video2"
+    # group_add:
+    #   - "44"
 
   notification-service:
     build:

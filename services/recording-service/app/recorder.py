@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import shlex
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -15,6 +17,22 @@ import structlog
 from app.config import get_settings
 
 log = structlog.get_logger(__name__)
+
+# Sources matching this look like a V4L2 device path (USB camera). A bare
+# integer like "0" is also accepted and normalised to "/dev/video0".
+_V4L2_PATH_RE = re.compile(r"^/dev/video\d+$")
+
+
+def _is_v4l2_source(source: str) -> bool:
+    return bool(_V4L2_PATH_RE.match(source) or source.isdigit())
+
+
+def _normalise_v4l2(source: str) -> str:
+    """Turn `0` / `1` into `/dev/video0` / `/dev/video1`.
+
+    Anything that already looks like a path passes through unchanged.
+    """
+    return f"/dev/video{source}" if source.isdigit() else source
 
 
 class CameraRecorder:
@@ -25,9 +43,19 @@ class CameraRecorder:
     the recorder POSTs metadata to the backend.
     """
 
-    def __init__(self, camera_id: UUID, source: str) -> None:
+    def __init__(
+        self,
+        camera_id: UUID,
+        source: str,
+        *,
+        config: dict[str, Any] | None = None,
+    ) -> None:
         self.camera_id = camera_id
         self.source = source
+        # Camera.config blob from the backend — lets USB cameras pin the
+        # v4l2 input_format / video_size / framerate that ffmpeg should
+        # request. Optional; sensible defaults if absent.
+        self.config: dict[str, Any] = config or {}
         self._proc: asyncio.subprocess.Process | None = None
         self._watcher: asyncio.Task | None = None
         self._stop = asyncio.Event()
@@ -42,16 +70,42 @@ class CameraRecorder:
 
     def _build_ffmpeg_cmd(self) -> list[str]:
         s = self.settings
-        # Note: -strftime 1 enables strftime in -segment output filenames.
-        return [
-            "ffmpeg",
-            "-hide_banner",
-            "-loglevel", "warning",
-            "-rtsp_transport", "tcp",
-            "-i", self.source,
-            "-c:v", s.recording_video_codec,
-            "-preset", s.recording_preset,
-            "-c:a", s.recording_audio_codec,
+        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "warning"]
+
+        if _is_v4l2_source(self.source):
+            # ── USB / V4L2 input ────────────────────────────────────────
+            # Order matters here: input-format/video-size/framerate must
+            # appear BEFORE `-i` so ffmpeg applies them when probing the
+            # device, not as output options.
+            cfg = self.config
+            input_format = cfg.get("v4l2_input_format", "mjpeg")
+            video_size   = cfg.get("v4l2_video_size",   "1280x720")
+            framerate    = cfg.get("v4l2_framerate",    15)
+
+            cmd += [
+                "-f", "v4l2",
+                "-input_format", str(input_format),
+                "-video_size", str(video_size),
+                "-framerate", str(framerate),
+                "-i", _normalise_v4l2(self.source),
+                # V4L2 webcams have no audio track — telling ffmpeg up
+                # front avoids a failed audio-encoder init.
+                "-an",
+                "-c:v", s.recording_video_codec,
+                "-preset", s.recording_preset,
+            ]
+        else:
+            # ── RTSP / RTMP / HTTP / MJPEG ──────────────────────────────
+            cmd += [
+                "-rtsp_transport", "tcp",  # ignored by non-RTSP, harmless
+                "-i", self.source,
+                "-c:v", s.recording_video_codec,
+                "-preset", s.recording_preset,
+                "-c:a", s.recording_audio_codec,
+            ]
+
+        # Common segmenter tail.
+        cmd += [
             "-f", "segment",
             "-segment_time", str(s.recording_segment_seconds),
             "-segment_format", s.recording_format,
@@ -59,6 +113,7 @@ class CameraRecorder:
             "-strftime", "1",
             self._segment_pattern,
         ]
+        return cmd
 
     async def start(self) -> None:
         cmd = self._build_ffmpeg_cmd()

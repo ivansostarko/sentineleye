@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import re
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -29,19 +30,73 @@ from app.trackers.iou_tracker import IoUTracker
 
 log = get_logger(__name__)
 
+_V4L2_PATH_RE = re.compile(r"^/dev/video\d+$")
+
+
+def _open_capture(source: str, config: dict[str, Any]) -> cv2.VideoCapture:
+    """Open ``source`` with the right backend and v4l2 hints.
+
+    ``cv2.VideoCapture(string)`` defaults to FFMPEG which fumbles bare
+    integers ("0" → tries to open file "0") and doesn't apply v4l2 device
+    properties. For USB cameras we explicitly use ``CAP_V4L2`` and set
+    fourcc / size / fps from the camera's config blob.
+    """
+    is_v4l2 = _V4L2_PATH_RE.match(source) is not None or source.isdigit()
+
+    if is_v4l2:
+        # Normalise "0" → "/dev/video0" and open with the V4L2 backend.
+        path = f"/dev/video{source}" if source.isdigit() else source
+        cap = cv2.VideoCapture(path, cv2.CAP_V4L2)
+        if not cap.isOpened():
+            return cap
+
+        fmt = str(config.get("v4l2_input_format", "mjpeg")).lower()
+        if fmt in {"mjpeg", "mjpg"}:
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        elif fmt in {"yuyv", "yuyv422"}:
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"YUYV"))
+
+        size = str(config.get("v4l2_video_size", "1280x720"))
+        if "x" in size:
+            try:
+                w, h = (int(p) for p in size.lower().split("x", 1))
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+            except ValueError:
+                pass
+
+        fps = config.get("v4l2_framerate", 15)
+        try:
+            cap.set(cv2.CAP_PROP_FPS, float(fps))
+        except (TypeError, ValueError):
+            pass
+
+        return cap
+
+    # Network sources (RTSP/RTMP/HTTP/MJPEG) — let OpenCV pick the backend.
+    return cv2.VideoCapture(source)
+
 
 class CameraPipeline:
-    def __init__(self, camera_id: UUID, source: str, *, target_fps: int = 15) -> None:
+    def __init__(
+        self,
+        camera_id: UUID,
+        source: str,
+        *,
+        target_fps: int = 15,
+        config: dict[str, Any] | None = None,
+    ) -> None:
         self.camera_id = camera_id
         self.source = source
         self.target_fps = target_fps
+        self.config: dict[str, Any] = config or {}
         self._stop = asyncio.Event()
         self._tracker = IoUTracker()
         self._detector = get_detector()
 
     async def run(self) -> None:
         settings = get_settings()
-        cap = cv2.VideoCapture(self.source)
+        cap = _open_capture(self.source, self.config)
         if not cap.isOpened():
             log.error("pipeline.open_failed", source=self.source)
             return

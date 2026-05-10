@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
 from prometheus_client import make_asgi_app
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.config import get_settings
 from app.logging import configure_logging, get_logger
@@ -27,6 +27,9 @@ class StartRequest(BaseModel):
     camera_id: UUID
     source: str
     target_fps: int = 15
+    # Mirrors `Camera.config` from the backend. USB cameras need v4l2
+    # hints (input_format/video_size/framerate); other transports ignore it.
+    config: dict[str, Any] = Field(default_factory=dict)
 
 
 @asynccontextmanager
@@ -52,7 +55,12 @@ async def healthz() -> dict[str, str]:
 async def start_pipeline(req: StartRequest) -> dict[str, str]:
     if req.camera_id in _pipelines:
         raise HTTPException(409, "Pipeline already running for that camera.")
-    pipe = CameraPipeline(req.camera_id, req.source, target_fps=req.target_fps)
+    pipe = CameraPipeline(
+        req.camera_id,
+        req.source,
+        target_fps=req.target_fps,
+        config=req.config,
+    )
     task = asyncio.create_task(pipe.run())
     _pipelines[req.camera_id] = (pipe, task)
     return {"status": "started", "camera_id": str(req.camera_id)}

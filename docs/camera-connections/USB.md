@@ -90,85 +90,91 @@ We'll force the right format below in step 6.
 
 ## 3. Fix permissions so the recorder can open the device
 
-By default, `/dev/videoN` is owned by `root:video` mode `crw-rw----`. The
-recording-service container runs as a non-root user (UID 1000), so it
-needs to be in the `video` group.
+By default, `/dev/videoN` is owned by `root:video` mode `crw-rw----`.
 
-### One-shot for the host shell (testing only)
+### Host shell (smoke test before bringing Docker in)
 
 ```bash
 sudo usermod -aG video $USER
 # Log out and back in (or run `newgrp video`) so the new group sticks.
-ffplay /dev/video0      # smoke test — you should see a window open
+ffplay /dev/video0      # you should see a live window open
 ```
 
-### For the Docker container
+### Inside the SentinelEye containers
 
-The container's user must be in a group whose **GID matches** the host's
-`video` group. On Debian/Ubuntu hosts the `video` GID is typically `44`,
-on Fedora it varies. Check on the host:
+`recording-service` and `ai-engine` currently run as **root** in their
+images, so file permissions on `/dev/videoN` are not a concern — root
+can open the device regardless of group ownership. The only thing
+required is the `devices:` passthrough in `docker-compose.yml`
+(step 4 below).
+
+If you later harden either Dockerfile to drop to a non-root user
+(recommended for production), you'll need to also pass the host's
+`video` GID through. Find it on the host:
 
 ```bash
 getent group video
-# video:x:44:john
+# video:x:44:john   ← GID 44 in this example, may differ on your distro
 ```
 
-The recording-service Dockerfile already creates a `video` group at GID
-`44` and adds the runtime user to it. If your host's `video` GID is
-different, override it with a build arg in `docker-compose.yml`:
+Then add `group_add` to the affected service in `docker-compose.yml`:
 
 ```yaml
 recording-service:
-  build:
-    context: .
-    dockerfile: docker/recording-service/Dockerfile
-    args:
-      VIDEO_GID: 44       # ← match `getent group video` on your host
+  ...
+  group_add:
+    - "44"       # match the GID from `getent group video`
 ```
+
+The compose file already has this line stubbed out next to the device
+list — see step 4.
 
 ---
 
 ## 4. Give the container access to the device
 
 This is the step people miss. By default Docker containers see *no*
-host devices. You have to pass each `/dev/videoN` through explicitly.
+host devices — you have to pass each `/dev/videoN` through explicitly.
 
-Edit `docker-compose.yml` and add a `devices:` list to `recording-service`
-**and** `ai-engine` (because the AI engine reads frames too):
+[`docker-compose.yml`](../../docker-compose.yml) already has a stubbed
+`devices:` block on **both** `recording-service` and `ai-engine`
+(both need read access — the recorder writes the .mp4, the AI engine
+pulls frames for inference). Find the marker comment `# ─── USB cameras
+─────` in each service, uncomment the lines, and edit them to match
+your host's actual `/dev/videoN` paths:
 
 ```yaml
 recording-service:
-  build:
-    context: .
-    dockerfile: docker/recording-service/Dockerfile
-  restart: unless-stopped
-  env_file: .env
-  environment:
-    <<: *common-env
-    BACKEND_URL: http://backend:8000
-  depends_on:
-    backend:
-      condition: service_started
-  ports:
-    - "8200:8200"
+  ...
   volumes:
     - recordings-data:/data/recordings
-  # ─── USB cameras ────────────────────────────────────────────
+  # ─── USB cameras ─────────────────────────────────────────────
   devices:
     - "/dev/video0:/dev/video0"        # one line per camera
     - "/dev/video2:/dev/video2"
-    # Or pass everything through (lazier; works if you trust the host):
-    # - "/dev:/dev"
-  group_add:
-    - "44"                              # host video group GID
+  # group_add:
+  #   - "44"                            # only if you switched to non-root user
 ```
 
-If you mount the entire `/dev` (the lazy form), Docker will hand the
-container access to every device the host adds *after* the container
-started — useful when you hot-plug cameras. The downside is a wider
-attack surface; only do it on a trusted host.
+Mirror exactly the same `devices:` list on `ai-engine`.
 
-After the edit:
+> ⚠ **Don't add device entries that don't exist on the host.** Docker
+> won't bring the container up at all — `docker compose up -d` fails
+> with `error gathering device information ... no such file or
+> directory`. That's why the stub block is commented out by default.
+
+### Lazy alternative: pass through the whole `/dev`
+
+```yaml
+devices:
+  - "/dev:/dev"
+```
+
+This hands the container access to every device the host has now *and*
+every device added later (hot-plug). Useful if you swap cameras around.
+The downside is a wider attack surface; only use on a trusted host.
+
+### Apply the change
 
 ```bash
 docker compose up -d recording-service ai-engine

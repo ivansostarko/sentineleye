@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 from uuid import UUID
 
 import structlog
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.config import get_settings
 from app.recorder import CameraRecorder
@@ -21,6 +21,10 @@ _recorders: dict[UUID, CameraRecorder] = {}
 class StartRequest(BaseModel):
     camera_id: UUID
     source: str
+    # Mirrors the `Camera.config` blob from the backend. The recorder reads
+    # `v4l2_input_format` / `v4l2_video_size` / `v4l2_framerate` for USB
+    # cameras; other transports ignore it.
+    config: dict[str, Any] = Field(default_factory=dict)
 
 
 @asynccontextmanager
@@ -43,7 +47,7 @@ async def healthz() -> dict[str, object]:
 async def start_recorder(req: StartRequest) -> dict[str, str]:
     if req.camera_id in _recorders:
         raise HTTPException(409, "Recorder already running for that camera.")
-    rec = CameraRecorder(req.camera_id, req.source)
+    rec = CameraRecorder(req.camera_id, req.source, config=req.config)
     await rec.start()
     _recorders[req.camera_id] = rec
     return {"status": "started", "camera_id": str(req.camera_id)}
