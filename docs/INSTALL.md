@@ -40,10 +40,17 @@ asyncio.run(main())
 
 Now visit:
 
+- Web app: http://localhost:8080 (built Flutter bundle, served by nginx)
 - API docs: http://localhost:8000/docs
 - MinIO console: http://localhost:9001 (`minioadmin` / `minioadmin`)
 
-Then run the Flutter client:
+The `frontend` service builds the Flutter web bundle and serves it via
+nginx, which also reverse-proxies `/api/*` and `/ws/*` to the backend. That
+makes everything same-origin — no CORS, and Web Crypto (used by
+`flutter_secure_storage`) works on any host.
+
+For active Flutter development with hot reload, skip the `frontend` container
+and run the dev server directly instead:
 
 ```bash
 cd apps/frontend
@@ -51,9 +58,9 @@ flutter pub get
 flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0
 ```
 
-Open http://localhost:8080 in your browser. Use `-d chrome` instead if you
-want Flutter to launch a browser for you (requires running as a non-root
-user — Chrome refuses to start as root without `--no-sandbox`).
+Then open http://localhost:8080 (use `localhost`, not `0.0.0.0` — browsers
+only treat `localhost` as a secure context). Use `-d chrome` if you want
+Flutter to auto-launch a browser (non-root user only).
 
 ## 2. Local dev (no Docker)
 
