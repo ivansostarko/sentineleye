@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 
@@ -11,6 +11,7 @@ from app.api.v1.deps import get_current_user, require_role, system_config_servic
 from app.core.config import get_settings
 from app.models.user import User, UserRole
 from app.schemas.system_config import AppVersion, SystemConfigPublic, SystemConfigUpdate
+from app.services.cache import get_cache
 from app.services.system_config_service import SystemConfigService
 
 router = APIRouter(prefix="/system", tags=["system"])
@@ -59,8 +60,13 @@ def _to_public(entity, *, secret_set: bool) -> SystemConfigPublic:
 async def get_config(
     service: Annotated[SystemConfigService, Depends(system_config_service)],
 ) -> SystemConfigPublic:
+    cached = await service.get_cached_payload()
+    if cached is not None:
+        return SystemConfigPublic.model_validate(cached)
     entity = await service.get()
-    return _to_public(entity, secret_set=SystemConfigService.secret_is_set(entity))
+    public = _to_public(entity, secret_set=SystemConfigService.secret_is_set(entity))
+    await service.cache_payload(public.model_dump(mode="json"))
+    return public
 
 
 @router.patch(
@@ -75,3 +81,27 @@ async def update_config(
 ) -> SystemConfigPublic:
     entity = await service.update(payload)
     return _to_public(entity, secret_set=SystemConfigService.secret_is_set(entity))
+
+
+# ─── Cache observability + admin ──────────────────────────────────────
+@router.get(
+    "/cache/stats",
+    dependencies=[Depends(require_role(UserRole.ADMIN))],
+)
+async def cache_stats() -> dict[str, Any]:
+    """Hit/miss counters, key count for our namespace, memory used."""
+    return await get_cache().stats()
+
+
+@router.post(
+    "/cache/invalidate",
+    dependencies=[Depends(require_role(UserRole.ADMIN))],
+)
+async def cache_invalidate(pattern: str = "*") -> dict[str, Any]:
+    """Drop every key matching ``pattern`` (default ``*`` = whole namespace).
+
+    Useful after a manual data fix. Pattern is a Redis glob — e.g.
+    ``cameras:*`` or ``cameras:id:<uuid>``.
+    """
+    deleted = await get_cache().invalidate(pattern)
+    return {"pattern": pattern, "deleted": deleted}

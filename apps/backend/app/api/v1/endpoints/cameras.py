@@ -27,10 +27,10 @@ async def list_cameras(
     page: int = Query(1, ge=1),
     size: int = Query(50, ge=1, le=200),
 ) -> Page[CameraPublic]:
-    items, total = await service.list(offset=(page - 1) * size, limit=size)
-    return Page[CameraPublic](
-        items=[_to_public(c) for c in items], total=total, page=page, size=size
+    items, total = await service.list_public_cached(
+        offset=(page - 1) * size, limit=size,
     )
+    return Page[CameraPublic](items=items, total=total, page=page, size=size)
 
 
 @router.post(
@@ -52,7 +52,7 @@ async def get_camera(
     service: Annotated[CameraService, Depends(camera_service)],
     _user: Annotated[User, Depends(get_current_user)],
 ) -> CameraPublic:
-    return _to_public(await service.get(camera_id))
+    return await service.get_public_cached(camera_id)
 
 
 @router.patch(
