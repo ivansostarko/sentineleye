@@ -65,8 +65,47 @@ To produce a **shippable Linux desktop binary** (handles toolchain + tarball):
 # → dist/sentineleye-<ver>-linux-x64-release-<utc>.tar.gz
 ```
 
+To produce a **shippable Android APK or AAB** (snap-Flutter-safe, signs with
+`apps/frontend/android/key.properties` if present):
+
+```bash
+./scripts/build/build-android.sh         # release APK
+./scripts/build/build-android.sh --aab   # App Bundle for Play Store
+# → apps/frontend/build/app/outputs/{flutter-apk,bundle/release}/...
+# → dist/sentineleye-<ver>-android-release-<utc>.{apk,aab}
+```
+
+To produce a **shippable Windows desktop bundle** (must run on Windows /
+WSL — Flutter has no Linux→Windows cross-compile):
+
+```bash
+./scripts/build/build-windows.sh         # release .exe + .zip
+# → apps/frontend/build/windows/x64/runner/Release/sentineleye.exe
+# → dist/sentineleye-<ver>-windows-x64-release-<utc>.zip
+```
+
+To produce a **signed iOS .ipa** for the App Store (must run on macOS
+with Xcode — Apple's toolchain is macOS-only):
+
+```bash
+./scripts/build/build-ios.sh             # signed app-store IPA
+./scripts/build/build-ios.sh --simulator # iOS Simulator .app for dev
+# → apps/frontend/build/ios/ipa/*.ipa
+# → dist/sentineleye-<ver>-ios-app-store-<utc>.ipa
+```
+
+To produce a **standalone web bundle** for any static host (CDN, S3,
+GitHub Pages — outside the bundled `frontend` Docker container):
+
+```bash
+./scripts/build/build-web.sh             # release CanvasKit bundle
+./scripts/build/build-web.sh --wasm      # WASM build for modern browsers
+# → apps/frontend/build/web/
+# → dist/sentineleye-<ver>-web-canvaskit-release-<utc>.tar.gz
+```
+
 See [INSTALL.md → Native Flutter clients](docs/INSTALL.md#3-native-flutter-clients)
-for all build flags and Android/iOS commands.
+for all build flags.
 
 ## Documentation
 

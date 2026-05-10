@@ -98,9 +98,15 @@ alembic upgrade head
 |---|---|
 | Linux desktop (release + tarball) | `./scripts/build/build-linux.sh` |
 | Linux desktop (debug, no tarball) | `./scripts/build/build-linux.sh --debug --no-archive` |
-| Android APK | `cd apps/frontend && flutter build apk --release` |
-| Android App Bundle | `cd apps/frontend && flutter build appbundle --release` |
-| iOS (requires macOS) | `cd apps/frontend && flutter build ios --release` |
+| Windows desktop (release + .zip) | `./scripts/build/build-windows.sh` *(must run on Windows / WSL)* |
+| Android APK (release + dist tarball-equivalent) | `./scripts/build/build-android.sh` |
+| Android App Bundle for Play Store | `./scripts/build/build-android.sh --aab` |
+| Android APK per-ABI (smaller for sideload) | `./scripts/build/build-android.sh --split-per-abi` |
+| iOS signed IPA for App Store | `./scripts/build/build-ios.sh` *(must run on macOS)* |
+| iOS .app for development device | `./scripts/build/build-ios.sh --app-bundle` |
+| iOS .app for the Simulator | `./scripts/build/build-ios.sh --simulator` |
+| Web bundle (release + tarball, standalone) | `./scripts/build/build-web.sh` |
+| Web bundle (WASM target for modern browsers) | `./scripts/build/build-web.sh --wasm` |
 | Web bundle (already containerised) | `docker compose build frontend` |
 
 The Linux script auto-installs the toolchain via `apt-get` when run as root,
