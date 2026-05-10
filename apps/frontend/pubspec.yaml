@@ -1,7 +1,7 @@
 name: sentineleye
 description: SentinelEye — multi-platform Flutter client for the SentinelEye CCTV platform.
 publish_to: "none"
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
@@ -44,6 +44,7 @@ dependencies:
   local_auth: ^2.3.0
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:

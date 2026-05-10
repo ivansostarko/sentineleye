@@ -1,6 +1,6 @@
 [project]
 name = "sentineleye-backend"
-version = "0.1.0"
+version = "0.2.0"
 description = "SentinelEye backend — FastAPI REST + WebSocket API"
 requires-python = ">=3.12"
 authors = [{ name = "SentinelEye Contributors" }]

@@ -16,6 +16,7 @@ from app.db.repositories import (
     CloudIntegrationRepository,
     DetectionEventRepository,
     RecordingRepository,
+    SystemConfigRepository,
     UserRepository,
 )
 from app.db.session import get_session
@@ -23,6 +24,7 @@ from app.models.user import User, UserRole
 from app.services.auth_service import AuthService
 from app.services.camera_service import CameraService
 from app.services.cloud_integration_service import CloudIntegrationService
+from app.services.system_config_service import SystemConfigService
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 
@@ -52,6 +54,10 @@ def cloud_integration_repo(session: DbSession) -> CloudIntegrationRepository:
     return CloudIntegrationRepository(session)
 
 
+def system_config_repo(session: DbSession) -> SystemConfigRepository:
+    return SystemConfigRepository(session)
+
+
 # ─── Services ──────────────────────────────────────────────────────────
 def auth_service(users: Annotated[UserRepository, Depends(user_repo)]) -> AuthService:
     return AuthService(users)
@@ -68,6 +74,12 @@ def cloud_integration_service(
     integrations: Annotated[CloudIntegrationRepository, Depends(cloud_integration_repo)],
 ) -> CloudIntegrationService:
     return CloudIntegrationService(integrations)
+
+
+def system_config_service(
+    repo: Annotated[SystemConfigRepository, Depends(system_config_repo)],
+) -> SystemConfigService:
+    return SystemConfigService(repo)
 
 
 # ─── Auth dependencies ────────────────────────────────────────────────
