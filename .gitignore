@@ -1,0 +1,88 @@
+# ─── Env / secrets ──────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ─── Python ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# ─── Flutter / Dart ─────────────────────────────────────────────────
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+android/.gradle/
+android/local.properties
+ios/Flutter/Generated.xcconfig
+ios/Runner/GeneratedPluginRegistrant.*
+
+# ─── Models & data ──────────────────────────────────────────────────
+models/*.pt
+models/*.onnx
+models/*.engine
+data/
+recordings/
+snapshots/
+*.mp4
+*.mkv
+*.avi
+*.mov
+!docs/**/*.mp4
+
+# ─── Logs ───────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── OS ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Docker volumes (when bind-mounted locally) ─────────────────────
+.docker-data/
+postgres-data/
+redis-data/
+minio-data/
+
+# ─── Node (if any tooling shows up) ─────────────────────────────────
+node_modules/

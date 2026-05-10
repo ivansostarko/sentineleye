@@ -1,0 +1,154 @@
+name: sentineleye
+
+x-common-env: &common-env
+  TZ: ${TZ:-UTC}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sentineleye}
+      POSTGRES_USER: ${POSTGRES_USER:-sentineleye}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentineleye}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sentineleye}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${S3_ACCESS_KEY:-minioadmin} ${S3_SECRET_KEY:-minioadmin} &&
+      (mc ls local/${S3_BUCKET:-sentineleye-recordings} || mc mb local/${S3_BUCKET:-sentineleye-recordings}) &&
+      echo 'minio bucket ready'
+      "
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - recordings-data:/data/recordings
+
+  backend-worker:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *common-env
+    depends_on:
+      - backend
+      - redis
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--beat", "-l", "info"]
+    volumes:
+      - recordings-data:/data/recordings
+
+  ai-engine:
+    build:
+      context: .
+      dockerfile: docker/ai-engine/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *common-env
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "8100:8100"
+    volumes:
+      - ai-models:/app/models
+
+  recording-service:
+    build:
+      context: .
+      dockerfile: docker/recording-service/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *common-env
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "8200:8200"
+    volumes:
+      - recordings-data:/data/recordings
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: docker/notification-service/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *common-env
+    ports:
+      - "8300:8300"
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  recordings-data:
+  ai-models:
