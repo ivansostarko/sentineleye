@@ -16,6 +16,7 @@ from app.db.repositories import (
     CameraRepository,
     CloudIntegrationRepository,
     DetectionEventRepository,
+    NotificationSettingsRepository,
     RecordingRepository,
     SystemConfigRepository,
     UserRepository,
@@ -26,6 +27,7 @@ from app.services.alert_service import AlertService
 from app.services.auth_service import AuthService
 from app.services.camera_service import CameraService
 from app.services.cloud_integration_service import CloudIntegrationService
+from app.services.notification_settings_service import NotificationSettingsService
 from app.services.system_config_service import SystemConfigService
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
@@ -64,6 +66,10 @@ def system_config_repo(session: DbSession) -> SystemConfigRepository:
     return SystemConfigRepository(session)
 
 
+def notification_settings_repo(session: DbSession) -> NotificationSettingsRepository:
+    return NotificationSettingsRepository(session)
+
+
 # ─── Services ──────────────────────────────────────────────────────────
 def auth_service(users: Annotated[UserRepository, Depends(user_repo)]) -> AuthService:
     return AuthService(users)
@@ -93,6 +99,12 @@ def alert_service(
     events: Annotated[AlertEventRepository, Depends(alert_event_repo)],
 ) -> AlertService:
     return AlertService(rules, events)
+
+
+def notification_settings_service(
+    repo: Annotated[NotificationSettingsRepository, Depends(notification_settings_repo)],
+) -> NotificationSettingsService:
+    return NotificationSettingsService(repo)
 
 
 # ─── Auth dependencies ────────────────────────────────────────────────
