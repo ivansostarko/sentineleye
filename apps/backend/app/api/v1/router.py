@@ -14,6 +14,7 @@ from app.api.v1.endpoints import (
     notification_settings,
     recordings,
     system,
+    system_admin,
     websockets,
 )
 
@@ -27,4 +28,5 @@ api_router.include_router(alerts.router)
 api_router.include_router(alert_events.router)
 api_router.include_router(notification_settings.router)
 api_router.include_router(system.router)
+api_router.include_router(system_admin.router)
 api_router.include_router(websockets.router)
