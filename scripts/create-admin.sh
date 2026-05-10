@@ -2,7 +2,7 @@
 # scripts/create-admin.sh — create an admin user via docker exec.
 set -euo pipefail
 
-EMAIL="${1:-admin@sentineleye.local}"
+EMAIL="${1:-admin@sentineleye.io}"
 PASSWORD="${2:-ChangeMe!1234}"
 NAME="${3:-Admin}"
 
