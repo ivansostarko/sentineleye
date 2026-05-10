@@ -13,6 +13,7 @@ from app.models.recording import StorageBackend
 class RecordingPublic(BaseModel):
     id: UUID
     camera_id: UUID
+    camera_name: str | None = None  # joined for display; None on lone get()
     started_at: datetime
     ended_at: datetime | None = None
     duration_seconds: float | None = None
