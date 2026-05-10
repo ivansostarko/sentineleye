@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import JSON, Boolean, Enum, Integer, String
+from sqlalchemy import JSON, Boolean, Enum, Float, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -64,6 +64,12 @@ class Camera(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         default=CameraStatus.UNKNOWN,
         nullable=False,
     )
+
+    # Geographic coordinates for map display. Populated from a places lookup
+    # at create-time; can be edited free-hand. Stored as plain doubles —
+    # PostGIS would be overkill at this scale.
+    latitude: Mapped[float | None] = mapped_column(Float)
+    longitude: Mapped[float | None] = mapped_column(Float)
 
     # Free-form extras: zones, line-crossing definitions, vendor metadata
     config: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)

@@ -14,6 +14,8 @@ from app.models.camera import CameraProtocol, CameraStatus
 class CameraBase(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     location: str | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
     protocol: CameraProtocol
     url: str = Field(min_length=1, max_length=1024)
     username: str | None = None
@@ -33,6 +35,8 @@ class CameraCreate(CameraBase):
 class CameraUpdate(BaseModel):
     name: str | None = None
     location: str | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
     enabled: bool | None = None
     record_continuous: bool | None = None
     detection_enabled: bool | None = None
