@@ -51,6 +51,12 @@ class CameraService:
         await self.cameras.add(camera)
         await self.cameras.session.flush()  # populate camera.id
         await self._reconcile(camera, prev_record=False, prev_detect=False)
+        # Server-side defaults (created_at, updated_at) are written by Postgres
+        # but not visible on the in-memory ORM object until we refresh. Without
+        # this, `CameraPublic.model_validate(camera, from_attributes=True)`
+        # triggers a sync lazy-load and blows up with `MissingGreenlet` under
+        # the async session.
+        await self.cameras.session.refresh(camera)
         await self._cache.invalidate(Keys.CAMERAS_ALL)
         return camera
 
@@ -111,7 +117,13 @@ class CameraService:
             setattr(camera, field, value)
         await self.cameras.session.flush()
 
+        # `_reconcile` may itself flush (Tuya URL refresh) so we let it run
+        # first, then refresh once at the end.
         await self._reconcile(camera, prev_record=prev_record, prev_detect=prev_detect)
+        # `updated_at` has onupdate=func.now() — server picked the new value.
+        # Pull it back so `_to_public` and the warmer don't trigger lazy-load
+        # outside the async greenlet (raises `MissingGreenlet` otherwise).
+        await self.cameras.session.refresh(camera)
         await self._cache.invalidate(Keys.CAMERAS_ALL)
         return camera
 
