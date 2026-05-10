@@ -8,11 +8,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.api.v1.deps import detection_repo, get_current_user
+from app.api.v1.deps import (
+    alert_service,
+    detection_repo,
+    get_current_user,
+)
 from app.models.detection_event import DetectionEvent
 from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.detection_event import DetectionEventCreate, DetectionEventPublic
+from app.services.alert_service import AlertService
 from app.services.event_bus import DETECTION_CHANNEL, publish
 
 router = APIRouter(prefix="/detection-events", tags=["detection-events"])
@@ -63,6 +68,7 @@ async def list_events(
 async def ingest_event(
     payload: DetectionEventCreate,
     repo: Annotated[..., Depends(detection_repo)],  # type: ignore[valid-type]
+    alerts: Annotated[AlertService, Depends(alert_service)],
     # Note: in production the AI engine authenticates via service token, not user JWT.
 ) -> DetectionEventPublic:
     event = DetectionEvent(
@@ -78,4 +84,7 @@ async def ingest_event(
     event = await repo.add(event)
     public = _to_public(event)
     await publish(DETECTION_CHANNEL, public.model_dump(mode="json"))
+    # Best-effort alert evaluation. Any failure is logged inside AlertService;
+    # the ingest path itself never blocks on alerting or notification.
+    await alerts.evaluate_detection(event)
     return public

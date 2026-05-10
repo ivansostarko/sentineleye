@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.core.security import decode_token
 from app.db.repositories import (
+    AlertEventRepository,
     AlertRuleRepository,
     CameraRepository,
     CloudIntegrationRepository,
@@ -21,6 +22,7 @@ from app.db.repositories import (
 )
 from app.db.session import get_session
 from app.models.user import User, UserRole
+from app.services.alert_service import AlertService
 from app.services.auth_service import AuthService
 from app.services.camera_service import CameraService
 from app.services.cloud_integration_service import CloudIntegrationService
@@ -48,6 +50,10 @@ def recording_repo(session: DbSession) -> RecordingRepository:
 
 def alert_repo(session: DbSession) -> AlertRuleRepository:
     return AlertRuleRepository(session)
+
+
+def alert_event_repo(session: DbSession) -> AlertEventRepository:
+    return AlertEventRepository(session)
 
 
 def cloud_integration_repo(session: DbSession) -> CloudIntegrationRepository:
@@ -80,6 +86,13 @@ def system_config_service(
     repo: Annotated[SystemConfigRepository, Depends(system_config_repo)],
 ) -> SystemConfigService:
     return SystemConfigService(repo)
+
+
+def alert_service(
+    rules: Annotated[AlertRuleRepository, Depends(alert_repo)],
+    events: Annotated[AlertEventRepository, Depends(alert_event_repo)],
+) -> AlertService:
+    return AlertService(rules, events)
 
 
 # ─── Auth dependencies ────────────────────────────────────────────────

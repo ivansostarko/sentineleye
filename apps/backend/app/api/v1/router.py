@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    alert_events,
     alerts,
     auth,
     cameras,
@@ -22,5 +23,6 @@ api_router.include_router(cloud_integrations.router)
 api_router.include_router(detection_events.router)
 api_router.include_router(recordings.router)
 api_router.include_router(alerts.router)
+api_router.include_router(alert_events.router)
 api_router.include_router(system.router)
 api_router.include_router(websockets.router)
