@@ -26,7 +26,7 @@ async def main():
     async with _SessionLocal() as s:
         svc = AuthService(UserRepository(s))
         user = await svc.register(UserCreate(
-            email='admin@sentineleye.local',
+            email='admin@sentineleye.io',
             password='ChangeMe!1234',
             full_name='Admin',
             role=UserRole.ADMIN,
