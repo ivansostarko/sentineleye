@@ -25,6 +25,8 @@ class CameraBase(BaseModel):
     detection_enabled: bool = True
     target_fps: int = Field(default=15, ge=1, le=60)
     bitrate_kbps: int | None = Field(default=None, ge=64, le=50000)
+    pinned_to_dashboard: bool = False
+    display_order: int = 0
     config: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -37,11 +39,16 @@ class CameraUpdate(BaseModel):
     location: str | None = None
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
+    url: str | None = Field(default=None, min_length=1, max_length=1024)
+    username: str | None = None
+    password: str | None = Field(default=None, repr=False)
     enabled: bool | None = None
     record_continuous: bool | None = None
     detection_enabled: bool | None = None
     target_fps: int | None = Field(default=None, ge=1, le=60)
     bitrate_kbps: int | None = Field(default=None, ge=64, le=50000)
+    pinned_to_dashboard: bool | None = None
+    display_order: int | None = None
     config: dict[str, Any] | None = None
 
 

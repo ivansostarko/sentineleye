@@ -71,5 +71,14 @@ class Camera(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     latitude: Mapped[float | None] = mapped_column(Float)
     longitude: Mapped[float | None] = mapped_column(Float)
 
+    # Whether this camera shows up as a widget on the dashboard grid.
+    pinned_to_dashboard: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+
+    # User-defined sort order on the cameras grid. Lower = earlier. Set via
+    # the drag-and-drop UI; ties broken by created_at via the supporting index.
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
     # Free-form extras: zones, line-crossing definitions, vendor metadata
     config: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
