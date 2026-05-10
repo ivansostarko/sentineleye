@@ -92,6 +92,22 @@ alembic upgrade head
 4. Document it in `docs/ARCHITECTURE.md` if it's a new component.
 5. Update the root `CLAUDE.md` if it changes a project-wide convention.
 
+## Building native clients
+
+| Platform | Command |
+|---|---|
+| Linux desktop (release + tarball) | `./scripts/build/build-linux.sh` |
+| Linux desktop (debug, no tarball) | `./scripts/build/build-linux.sh --debug --no-archive` |
+| Android APK | `cd apps/frontend && flutter build apk --release` |
+| Android App Bundle | `cd apps/frontend && flutter build appbundle --release` |
+| iOS (requires macOS) | `cd apps/frontend && flutter build ios --release` |
+| Web bundle (already containerised) | `docker compose build frontend` |
+
+The Linux script auto-installs the toolchain via `apt-get` when run as root,
+otherwise prints the exact `sudo apt-get install` line you need. It bakes
+the `apps/frontend/version` from `pubspec.yaml` into the tarball name so
+artifacts are unambiguous.
+
 ## Local CCTV simulator
 
 If you don't have a real RTSP camera handy, use ffmpeg to push a sample file:

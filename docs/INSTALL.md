@@ -105,7 +105,54 @@ pip install -e ".[dev]"
 uvicorn app.main:app --reload --port 8300
 ```
 
-## 3. Production (Kubernetes)
+## 3. Native Flutter clients
+
+The web bundle works in any browser, but you can also ship native binaries
+straight from the same codebase.
+
+### Linux desktop
+
+A wrapper script in [scripts/build/build-linux.sh](../scripts/build/build-linux.sh)
+handles everything — system-package check, `flutter create --platforms=linux`
+when needed, `flutter build linux --release`, and an optional tarball under
+`dist/`.
+
+```bash
+# One-shot build (release + tarball in dist/)
+./scripts/build/build-linux.sh
+
+# Common flags:
+./scripts/build/build-linux.sh --debug          # debug build
+./scripts/build/build-linux.sh --profile        # profile build (DevTools-attachable)
+./scripts/build/build-linux.sh --clean          # flutter clean first
+./scripts/build/build-linux.sh --no-archive     # skip tarball
+./scripts/build/build-linux.sh --skip-deps      # don't try to apt-install missing tools
+./scripts/build/build-linux.sh --dart-define=API_BASE=https://api.acme.com
+```
+
+The first run as root will `apt-get install` the Linux toolchain
+(`clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev`).
+Without sudo you'll get instructions to install them manually, then you can
+re-run.
+
+Output paths:
+
+| Asset | Location |
+|---|---|
+| Bundle dir | `apps/frontend/build/linux/<arch>/<mode>/bundle/` |
+| Executable | `<bundle>/sentineleye` |
+| Tarball | `dist/sentineleye-<version>-linux-<arch>-<mode>-<utc>.tar.gz` |
+
+To run after building: `./apps/frontend/build/linux/x64/release/bundle/sentineleye`.
+
+### Android & iOS
+
+Both are stock Flutter — `flutter build apk --release` /
+`flutter build appbundle --release` from `apps/frontend/`. We don't ship a
+wrapper for these yet; they go through the standard Google Play and Xcode
+signing flows.
+
+## 4. Production (Kubernetes)
 
 Treat the compose file as the contract: each service is independently scalable.
 A first-cut Helm chart is on the roadmap. See [DEPLOYMENT.md](DEPLOYMENT.md) for

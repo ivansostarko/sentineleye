@@ -57,6 +57,17 @@ flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0
 # then open http://localhost:8080 — or use -d chrome / -d linux / -d android
 ```
 
+To produce a **shippable Linux desktop binary** (handles toolchain + tarball):
+
+```bash
+./scripts/build/build-linux.sh
+# → apps/frontend/build/linux/x64/release/bundle/sentineleye
+# → dist/sentineleye-<ver>-linux-x64-release-<utc>.tar.gz
+```
+
+See [INSTALL.md → Native Flutter clients](docs/INSTALL.md#3-native-flutter-clients)
+for all build flags and Android/iOS commands.
+
 ## Documentation
 
 | Doc                                        | What's inside                          |
