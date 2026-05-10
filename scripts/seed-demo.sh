@@ -26,6 +26,7 @@ CAMERAS = [
         "longitude": 15.9775,
         "protocol": CameraProtocol.RTSP,
         "url": "rtsp://demo.local:554/front_gate",
+        "pinned_to_dashboard": True,
     },
     {
         "name": "Parking Lot",
@@ -34,6 +35,7 @@ CAMERAS = [
         "longitude": 15.9760,
         "protocol": CameraProtocol.ONVIF,
         "url": "http://demo.local:8080/onvif/device_service",
+        "pinned_to_dashboard": True,
     },
     {
         "name": "Loading Dock",
@@ -42,6 +44,7 @@ CAMERAS = [
         "longitude": 15.9785,
         "protocol": CameraProtocol.RTSP,
         "url": "rtsp://demo.local:554/loading_dock",
+        "pinned_to_dashboard": False,
     },
     {
         "name": "Reception",
@@ -50,6 +53,7 @@ CAMERAS = [
         "longitude": 15.9682,
         "protocol": CameraProtocol.RTSP,
         "url": "rtsp://demo.local:554/reception",
+        "pinned_to_dashboard": False,
     },
 ]
 
@@ -85,6 +89,7 @@ async def main():
                 record_continuous=False,
                 detection_enabled=False,
                 target_fps=10,
+                pinned_to_dashboard=c.get("pinned_to_dashboard", False),
             ))
             created += 1
         await session.commit()
